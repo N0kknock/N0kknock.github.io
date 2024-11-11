@@ -110,8 +110,11 @@ libc = elf.libc
 不知道原理是什么🧐 但下次试一试😋
 ### EZ_fmt
 这道题算是我第一次做fmt类型的题目，为了做这道题才开始翻wiki翻资料，才开始学习fmt。虽说题还算常规，但还是记录下来，也算是记录自己学习fmt的过程。有机会单开一篇讲一下fmt。  
+
 只允许读取`0x30`进行fmt，所以对于payload的构造要慎重  
+
 除此之外补充一点：如果读取的字节太少那就很难完成任意地址写，此时出题人往往希望你利用fmt进行泄露  
+
 ```python
 from pwn import *
 context(arch='amd64', os='linux', log_level='debug')
@@ -158,9 +161,7 @@ io.interactive()
 ```
 ### Inversted world
 这道题真是超超超有意思  
-
 只要善用gdb动调，理解程序在干什么就很好做了  
-
 _read函数实现与read方向相反的读写操作  
 
 ```python
