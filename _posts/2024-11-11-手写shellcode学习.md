@@ -52,4 +52,4 @@ tags: [pwn]
 [https://nets.ec/Ascii_shellcode](https://nets.ec/Ascii_shellcode) 有空我应该会把内容翻译出来
 ### 字母数字 shellcode
 ### 小写字母数字shellcode
-## 
+## 00截断

