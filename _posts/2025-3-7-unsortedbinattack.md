@@ -12,10 +12,23 @@ tags: [pwn]
 ## unsorted bin attack
 该攻击主要利用unsorted bin作为双向循环链表的特性，利用其unlink的过程
 
+利用条件：可修改unsorted bin中的chunk的bk指针
+
 利用效果：向目标地址写入一个极大值(该值实际上是main_arena的一个固定偏移)
 
 正常情况下的unsorted bin:
 ![alt text](../assets/image/unsorted_bin_attack1.png)
 
+当unlink时，会执行下面关键代码：
+```c
+          bck = victim -> bk
+          unsorted_chunks (av)->bk = bck;
+          bck->fd = unsorted_chunks (av);
+```
 
+尤其是最后一行`bck->fd = unsorted_chunks (av)`成为实施攻击的关键
+![alt text](../assets/image/unsorted_bin_attack2.png)
+
+## 高版本进行unsorted bin attack需要注意的事项
+当高版本有tcache之后，从unsorted bin中malloc到
 
