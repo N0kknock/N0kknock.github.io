@@ -1,0 +1,21 @@
+---
+title: unsorted bin attack
+date: 2025-3-7 14:00:00 +0800
+categories: [Blog, pwn]
+tags: [pwn]
+---
+阵营：混沌中立
+
+## unsorted bin leak
+由于unsorted bin为双向循环链表，其中的chunk的fd与bk指针均可在一定条件下存储着main_arena+offset地址，通过该地址可以计算出libc基地址（问题就是如何在该chunk进入unsorted bin之后你依然能够输出其中内容，这交给UAF或其他攻击手法）
+
+## unsorted bin attack
+该攻击主要利用unsorted bin作为双向循环链表的特性，利用其unlink的过程
+
+利用效果：向目标地址写入一个极大值(该值实际上是main_arena的一个固定偏移)
+
+正常情况下的unsorted bin:
+![alt text](../assets/image/unsorted_bin_attack1.png)
+
+
+
