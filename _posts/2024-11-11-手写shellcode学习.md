@@ -48,8 +48,8 @@ tags: [pwn]
   构造函数`read(0,addr,len)`，此时往往需要观察寄存器状态，尽量利用有效数据以最短的字节达到我们的目的
 ## 限制字符shellcode
 ### ascii shellcode
-题目会限制输入的字符必须是可见字符，即ascii码范围内的字符，这就需要我们对汇编指令所映射的机器码有了解，可以参考这个网站：
-[https://nets.ec/Ascii_shellcode](https://nets.ec/Ascii_shellcode) 有空我应该会把内容翻译出来
+题目会限制输入的字符必须是可见字符，即ascii码范围内的字符，这就需要对汇编指令所映射的机器码有了解，可以参考该网站：
+[https://nets.ec/Ascii_shellcode](https://nets.ec/Ascii_shellcode) 
 ### 字母数字 shellcode
 ### 小写字母数字shellcode
 ## 00截断
