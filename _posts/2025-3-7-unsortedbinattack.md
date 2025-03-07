@@ -30,5 +30,7 @@ tags: [pwn]
 ![alt text](../assets/image/unsorted_bin_attack2.png)
 
 ## 高版本进行unsorted bin attack需要注意的事项
-当高版本有tcache之后，从unsorted bin中malloc到
+当高版本有tcache之后，特别是在tcache未满时，从unsorted bin中malloc到的堆块并不会直接返回，而是先放入tcache bin中，再从tcache bin中取chunk，此时该攻击方法会出现问题。
+
+绕过：
 
