@@ -78,7 +78,8 @@ if ((unsigned long) (size) >= (unsigned long) (nb + MINSIZE))
 利用原理：
 如果向small bin中申请chunk(0x20 - 0x410)
 
-```c /*
+```c 
+    /*
        If a small request, check regular bin.  Since these "smallbins"
        hold one size each, no searching within bins is necessary.
        (For a large request, we need to wait until unsorted chunks are
