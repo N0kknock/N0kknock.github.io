@@ -4,7 +4,7 @@ date: 2025-3-8 00:00:00 +0800
 categories: [Blog, pwn]
 tags: [pwn]
 ---
-可以和我打一辈子house of吗？求求你了，我什么都会做的
+网安学妹会梦到土木学长吗？
 
 只记录在其他部分未曾记录的house of 手法
 
@@ -139,5 +139,23 @@ if ((unsigned long) (size) >= (unsigned long) (nb + MINSIZE))
 
 ## house of orange
 
-简而言之，就是当题目中没有提供free()的时候，我们能通过漏洞利用获得free()的效果
+简而言之，就是当题目中没有提供free()的时候，我们能通过漏洞利用，获得一个在unsorted bin中的堆块。
+
+虽然这个效果本身看起来很小，但配合其他攻击手法就能做很多事情
+
+原理:
+
+当top chunk无法满足我们的需求，原本的top chunk就会被丢进unsorted bin中作为一个free chunk
+
+看起来简单，但实际上需要满足一些条件：
+- sysmalloc有mmap与brk两种分配方式，我们需要让堆以brk的方式拓展，这样才能使chunk进入unsorted bin中。要符合该条件，malloc的尺寸不能大于mmp.mmap_threshold = 128k(否则会直接使用mmap)
+- 其次要满足sysmalloc中对top size的合法性检查：size 要大于 MINSIZE(0x10)、size 要小于之后申请的 chunk size + MINSIZE(0x10)、size 的 prev inuse 位必须为 1
+
+程序或许不会允许分配过大的内存，此时我们可以通过堆溢出写，将top chunk的size按照上述条件进行调整，然后再进行malloc
+
+后续利用涉及IO，将在另一篇文章中详述
+
+## house of rabbit
+
+
 
