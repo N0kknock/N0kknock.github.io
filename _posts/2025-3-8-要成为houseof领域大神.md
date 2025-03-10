@@ -157,6 +157,61 @@ if ((unsigned long) (size) >= (unsigned long) (nb + MINSIZE))
 后续利用涉及IO，将在另一篇文章中详述
 
 ## house of rabbit
+关于malloc_consolidate的触发:
+```c
+#define FASTBIN_CONSOLIDATION_THRESHOLD  (65536UL)
+
+...
+    if ((unsigned long)(size) >= FASTBIN_CONSOLIDATION_THRESHOLD) {
+      if (have_fastchunks(av))
+		malloc_consolidate(av);
+```
+当申请的堆块大小大于 65546 时，会触发fastbin_consolidate
+
+在malloc_consolidate()中：
+```c
+if (nextchunk != av->top) {
+  nextinuse = inuse_bit_at_offset(nextchunk, nextsize);
+
+  if (!nextinuse) { //可以看到，这里只检查了nextinuse，而没有检查chunk本身的size
+    size += nextsize;
+    unlink(av, nextchunk, bck, fwd);
+  } else
+    clear_inuse_bit_at_offset(nextchunk, 0);
+
+  first_unsorted = unsorted_bin->fd;
+  unsorted_bin->fd = p;
+  first_unsorted->bk = p;
+
+  if (!in_smallbin_range (size)) {
+    p->fd_nextsize = NULL;
+    p->bk_nextsize = NULL;
+  }
+
+  set_head(p, size | PREV_INUSE);
+  p->bk = unsorted_bin;
+  p->fd = first_unsorted;
+  set_foot(p, size);
+}
+
+else {
+  size += nextsize;
+  set_head(p, size | PREV_INUSE);
+  av->top = p;
+}
+```
+循环处理所有fastbin chunk，当该chunk与top chunk相邻则合并；若不相邻则放入unsorted bin中，同时设置`prev_size`和`prev_inuse`位
+
+- 当可以修改fast bin chunk的fd指针：
+  一般来说都可以打double free
+- 当可以修改fast bin chunk的size：
+  申请两个大小相同的chunk再将其释放到fast bin，修改其中一个chunk的大小覆盖到另一个chunk，此时触发consolidate，这两个chunk会进入大小不同的small bin中从而获得chunk overlapping(但这种时候为什么我不直接进行堆块重叠呢？)
+
+## house of roman
+一种结合fastbin attack与unsortedbin attack的trick，插个眼，感觉高版本考的不是很多
+
+## house of storm
+
 
 
 
